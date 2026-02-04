@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# 1. Установка системных зависимостей для корректной работы Chromium
+# Установка системных библиотек
 RUN apt-get update && apt-get install -y \
     libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
     libxkbcommon0 libxcomposite1 libxdamage1 libxext6 libxfixes3 \
@@ -9,18 +9,19 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# 2. Установка Python-библиотек
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Устанавливаем gunicorn для стабильности веб-сервера
+RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
-# 3. Установка Playwright и Chromium (важно запускать через python -m)
+# Установка Playwright
 RUN python -m playwright install chromium --with-deps
 
 COPY . .
 
-# 4. Открываем порт для Render
+# Создаем папку music заранее, чтобы не было ошибок доступа
+RUN mkdir -p music
+
 EXPOSE 8080
 
-# 5. ГЛАВНОЕ: Запуск сервера и бота ОДНОВРЕМЕННО
-# Мы используем '&', чтобы запустить app.py в фоне и сразу запустить бота
-CMD python3 server/app.py & python3 bot/main_bot.py
+# Запуск: Сначала бот в фоне, затем веб-сервер gunicorn
+CMD python3 bot/main_bot.py & gunicorn --bind 0.0.0.0:8080 server.app:app
