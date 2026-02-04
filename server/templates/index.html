@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>BIBABIT // 비바비트</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Caveat:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body { cursor: crosshair; overflow-x: hidden; font-family: 'Nanum Pen Script', cursive; }
+        .neon-trail {
+            pointer-events: none; position: fixed; width: 6px; height: 6px;
+            background: #A855F7; border-radius: 50%; filter: blur(3px);
+            box-shadow: 0 0 12px #D8B4FE; z-index: 9999;
+        }
+        .korean-title { font-family: 'Nanum Pen Script', cursive; font-size: 1.5rem; color: #D8B4FE; opacity: 0.7; }
+        .main-title { font-family: 'Caveat', cursive; letter-spacing: 2px; }
+    </style>
+</head>
+<body class="bg-black text-purple-400 p-10 bg-[radial-gradient(circle_at_center,_#1a1a1a_0%,_#000_100%)]">
+
+    <div class="max-w-xl mx-auto border border-purple-500/30 p-8 rounded-[2rem] shadow-[0_0_60px_rgba(168,85,247,0.15)] bg-black/80 backdrop-blur-xl relative">
+        <div class="absolute -top-4 -left-4 korean-title rotate-[-12deg]">비바비트</div>
+        
+        <h1 class="text-5xl main-title text-center mb-8 text-white drop-shadow-[0_0_10px_#A855F7]">BIBABIT</h1>
+
+        <div class="relative mb-6">
+            <input type="text" id="url" placeholder="Paste link here..." 
+                   class="w-full p-4 bg-transparent border-b-2 border-purple-900 text-white focus:border-purple-400 outline-none transition-all text-2xl">
+        </div>
+
+        <button onclick="startCapture()" 
+                class="w-full bg-transparent border-2 border-purple-500 text-purple-300 hover:text-white hover:bg-purple-500/20 py-3 rounded-full transition-all text-2xl mb-4">
+            CAPTURE ♬
+        </button>
+        
+        <div id="status" class="text-center text-xl h-8 text-purple-700 animate-pulse">Waiting for signal...</div>
+        
+        <div class="mt-8">
+            <h2 class="text-xl mb-4 border-b border-purple-900/50 flex justify-between">
+                <span>DATABASE // 자료</span>
+                <span id="fileCount">0</span>
+            </h2>
+            <div id="fileList" class="space-y-4 max-h-64 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <div id="trail-container"></div>
+
+    <script>
+        // След мышки
+        document.addEventListener('mousemove', (e) => {
+            const trail = document.createElement('div');
+            trail.className = 'neon-trail';
+            trail.style.left = e.clientX + 'px';
+            trail.style.top = e.clientY + 'px';
+            document.getElementById('trail-container').appendChild(trail);
+            setTimeout(() => { trail.style.opacity = '0'; setTimeout(() => trail.remove(), 500); }, 100);
+        });
+
+        async function startCapture() {
+            const urlInput = document.getElementById('url');
+            const status = document.getElementById('status');
+            const url = urlInput.value;
+            if (!url) return;
+
+            status.innerText = "Intercepting... 비바비트";
+            await fetch('/download', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({url})
+            });
+            urlInput.value = '';
+        }
+
+        async function loadFiles() {
+            const res = await fetch('/files');
+            const files = await res.json();
+            document.getElementById('fileCount').innerText = files.length;
+            document.getElementById('fileList').innerHTML = files.map(f => `
+                <div class="flex justify-between items-center p-2 border-b border-purple-900/20 group">
+                    <span class="text-lg truncate w-48 text-zinc-400 group-hover:text-purple-300 transition-colors">${f}</span>
+                    <a href="/listen/${f}" download class="text-sm border border-purple-900 px-3 py-1 rounded-full hover:bg-purple-900">GET</a>
+                </div>
+            `).join('');
+        }
+        setInterval(loadFiles, 5000);
+        loadFiles();
+    </script>
+</body>
+</html>
