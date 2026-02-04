@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+import logging
 from playwright.async_api import async_playwright
 
 async def intercept():
@@ -9,7 +10,7 @@ async def intercept():
         return
     url = sys.argv[1]
     
-    # Определяем путь к папке music в корне проекта
+    # Путь к папке music в корне GANGPYTHON
     current_dir = os.path.dirname(os.path.abspath(__file__))
     music_dir = os.path.join(current_dir, "music")
     
@@ -19,8 +20,19 @@ async def intercept():
     captured = False
 
     async with async_playwright() as p:
-        # headless=True КРИТИЧНО для Render (облака без монитора)
-        browser = await p.chromium.launch(headless=True) 
+        # Добавляем КРИТИЧЕСКИЕ флаги для работы в Docker/Render
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-software-rasterizer',
+                '--no-zygote'
+            ]
+        )
+        
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
@@ -28,12 +40,12 @@ async def intercept():
 
         async def on_response(response):
             nonlocal captured
-            # Фильтр для аудио-потоков Splice
+            # Перехват аудио-потоков
             content_type = response.headers.get("content-type", "")
             if "audio" in content_type or ".mp3" in response.url or "cdn-media" in response.url:
                 try:
                     data = await response.body()
-                    if len(data) < 30000: return # Игнорируем мелкие системные звуки
+                    if len(data) < 30000: return 
                     
                     filename = f"GANG_SAMPLE_{os.urandom(2).hex()}.mp3"
                     filepath = os.path.join(music_dir, filename)
@@ -49,29 +61,30 @@ async def intercept():
         page.on("response", on_response)
         
         try:
-            print(f"[*] BIBABIT CLOUD: Открываю {url}")
-            # Переходим на страницу
-            await page.goto(url, wait_until="networkidle", timeout=60000)
+            print(f"[*] BIBABIT CLOUD: Загрузка {url}")
+            # Увеличиваем таймаут для медленных серверов облака
+            await page.goto(url, wait_until="networkidle", timeout=90000)
             
-            # Пытаемся нажать кнопку Play автоматически
-            # Splice часто использует aria-label="Play" или иконки
-            play_buttons = [
-                page.get_by_label("Play", exact=False),
-                page.locator("button:has-text('Play')"),
-                page.locator(".sp-player-button") # Распространенный класс
+            # Попытка найти и нажать кнопку Play
+            play_selectors = [
+                "button[aria-label*='Play']",
+                ".sp-player-button",
+                "button:has-text('Play')",
+                "[data-testid='play-button']"
             ]
             
-            for btn in play_buttons:
+            for selector in play_selectors:
                 try:
+                    btn = page.locator(selector).first
                     if await btn.is_visible():
                         await btn.click()
-                        print("[*] Авто-воспроизведение активировано")
+                        print(f"[*] BIBABIT: Кнопка {selector} нажата")
                         break
                 except:
                     continue
 
-            # Ждем перехвата до 20 секунд
-            for _ in range(40): 
+            # Ожидание захвата (до 30 сек)
+            for _ in range(60): 
                 if captured:
                     break
                 await asyncio.sleep(0.5)
