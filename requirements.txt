@@ -1,4 +1,4 @@
 flask
 playwright
 requests
-pyTelegramBotAPI
+aiogram
